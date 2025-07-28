@@ -167,6 +167,96 @@ class TestProductRoutes(TestCase):
     # ADD YOUR TEST CASES HERE
     #
 
+    def test_get_product(self):
+        """It should Get a single Product"""
+        # create a product to read
+        test_product = self._create_products(1)[0]
+        response = self.client.get(f"{BASE_URL}/{test_product.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["name"], test_product.name)
+
+    def test_get_product_not_found(self):
+        """It should not Get a Product that's not found"""
+        response = self.client.get(f"{BASE_URL}/0")  # ID 0 should not exist
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertIn("was not found", data["message"])
+
+    def test_update_product(self):
+        """It should Update an existing Product"""
+        test_product = self._create_products(1)[0]
+        update_data = test_product.serialize()
+        update_data["description"] = "A new description!"
+        response = self.client.put(f"{BASE_URL}/{test_product.id}", json=update_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["description"], "A new description!")
+
+    def test_delete_product(self):
+        """It should Delete a Product"""
+        test_product = self._create_products(1)[0]
+        response = self.client.delete(f"{BASE_URL}/{test_product.id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        # Try to retrieve after deletion
+        response = self.client.get(f"{BASE_URL}/{test_product.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_list_all_products(self):
+        """It should List all Products"""
+        self._create_products(5)
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 5)
+
+    def test_query_product_by_name(self):
+        """It should Query Products by Name"""
+        products = self._create_products(3)
+        test_product = products[0]
+        response = self.client.get(f"{BASE_URL}?name={test_product.name}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        # All should have the queried name:
+        for item in data:
+            self.assertEqual(item["name"], test_product.name)
+
+    def test_query_product_by_category(self):
+        """It should Query Products by Category"""
+        products = self._create_products(3)
+        category = products[0].category.name
+        response = self.client.get(f"{BASE_URL}?category={category}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        for item in data:
+            self.assertEqual(item["category"], category)
+
+    def test_query_product_by_availability(self):
+        """It should Query Products by Availability"""
+        products = self._create_products(3)
+        available = products[0].available
+        response = self.client.get(f"{BASE_URL}?available={str(available).lower()}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        for item in data:
+            self.assertEqual(item["available"], available)
+
+    def test_method_not_allowed(self):
+        """It should respond with 405 for disallowed HTTP methods"""
+        # POST is not allowed on single resource
+        response = self.client.post(f"{BASE_URL}/1")
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        data = response.get_json()
+        self.assertEqual(data["error"], "Method not Allowed")
+
+    def test_query_product_by_invalid_category(self):
+        """It should return empty list on invalid category"""
+        self._create_products(2)
+        response = self.client.get(f"{BASE_URL}?category=INVALID")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data, [])
+
     ######################################################################
     # Utility functions
     ######################################################################
